@@ -7632,6 +7632,7 @@ numeric values will be `bigint` instead of `number`.
 StatFs {
   type: 1397114950,
   bsize: 4096,
+  frsize: 4096,
   blocks: 121938943,
   bfree: 61058895,
   bavail: 61058895,
@@ -7646,6 +7647,7 @@ StatFs {
 StatFs {
   type: 1397114950n,
   bsize: 4096n,
+  frsize: 4096n,
   blocks: 121938943n,
   bfree: 61058895n,
   bavail: 61058895n,
@@ -7701,6 +7703,16 @@ added:
 * Type: {number|bigint}
 
 Optimal transfer block size.
+
+#### `statfs.frsize`
+
+<!-- YAML
+added: REPLACEME
+-->
+
+* Type: {number|bigint}
+
+Fundamental file system block size.
 
 #### `statfs.ffree`
 
