@@ -299,6 +299,7 @@
       'type': 'static_library',
       'toolsets': ['host', 'target'],
       'dependencies': [
+        'torque_generated_initializers',
         'v8_base_without_compiler',
         'v8_shared_internal_headers',
         'v8_pch',
