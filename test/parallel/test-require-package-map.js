@@ -17,7 +17,7 @@ const packageMapPath = fixtures.path('package-map/package-map.json');
 const fileUrlFixturePath = tmpdir.resolve('package-map-file-url.json');
 writeFileSync(fileUrlFixturePath, JSON.stringify({
   packages: {
-    root: {
+    'root': {
       path: pathToFileURL(fixtures.path('package-map/root')).href,
       dependencies: { 'dep-a': 'dep-a' },
     },

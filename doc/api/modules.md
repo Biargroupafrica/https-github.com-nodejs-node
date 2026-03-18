@@ -1290,10 +1290,8 @@ This section was moved to
 [Determining module system]: packages.md#determining-module-system
 [ECMAScript Modules]: esm.md
 [GLOBAL_FOLDERS]: #loading-from-the-global-folders
-[Package maps]: packages.md#package-maps
 [`"main"`]: packages.md#main
 [`"type"`]: packages.md#type
-[`--experimental-package-map`]: cli.md#--experimental-package-mappath
 [`--trace-require-module`]: cli.md#--trace-require-modulemode
 [`ERR_REQUIRE_ASYNC_MODULE`]: errors.md#err_require_async_module
 [`ERR_UNSUPPORTED_DIR_IMPORT`]: errors.md#err_unsupported_dir_import
