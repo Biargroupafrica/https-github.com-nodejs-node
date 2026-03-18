@@ -981,7 +981,7 @@ node --experimental-package-map=./package-map.json app.js
 ### Configuration file format
 
 The package map configuration file is a JSON file with a `packages` object.
-Each key in `packages` is a unique identifier for a package entry:
+Each key in `packages` is called a package ID and is a unique identifier for a package entry:
 
 ```json
 {
@@ -1008,9 +1008,10 @@ Each key in `packages` is a unique identifier for a package entry:
 
 Each package entry has the following fields:
 
-* `path` {string} **Required.** Relative path from the configuration file to
-  the package directory. Each path must be unique across all packages in the
-  map; duplicate paths will throw an [`ERR_PACKAGE_MAP_INVALID`][] error.
+* `path` {string} **Required.** Absolute or relative path from the configuration
+  file to the package directory. Multiple packages are allowed to share the same
+  path; consumers must key module instances by both package and package IDs to
+  differentiate them.
 * `dependencies` {Object} An object mapping bare specifiers to package keys.
   Each key is the import name used in source code, and each value is the
   corresponding package key in the `packages` object. Defaults to an empty
@@ -1020,9 +1021,10 @@ Each package entry has the following fields:
 
 When a bare specifier is encountered:
 
-1. Node.js determines which package contains the importing file by checking
-   if the file path is within any package's `path`.
-2. If the importing file is not within any mapped package, an
+1. Node.js determines which package performs the resolution request.
+    * If possible the package ID for the importer file should be provided to the resolution algorithm.
+    * Failing that, the resolution will check if the file path is within any package's `path`.
+2. If no package ID is provided and the importing file is not within any mapped package, an
    [`ERR_PACKAGE_MAP_EXTERNAL_FILE`][] error is thrown.
 3. Node.js looks up the specifier's package name in the importing package's
    `dependencies` object to find the corresponding package key.
@@ -1030,19 +1032,7 @@ When a bare specifier is encountered:
 5. If the specifier is not in `dependencies`, a
    `MODULE_NOT_FOUND` error is thrown.
 
-### Subpath resolution
-
-Package maps support importing subpaths. Given the configuration above:
-
-```js
-// In packages/app/index.js
-import { helper } from '@myorg/utils';        // Resolves to ./packages/utils
-import { format } from '@myorg/utils/format'; // Resolves to ./packages/utils/format
-```
-
-The subpath portion of the specifier is preserved and appended to the resolved
-package path. The target package's `package.json` [`"exports"`][] field is
-then used to resolve the final file path.
+More details can be found in the [resolution algorithm pseudo-code][].
 
 ### Multiple package versions
 
@@ -1077,6 +1067,58 @@ can map the same specifier to different targets:
 
 Both `app` and `legacy` can `import 'component'`, but they resolve to
 different paths based on their declared dependencies.
+
+### Multiple packages for the same path
+
+To address complex hoisting situations, multiple packages may share the same
+path, which introduces ambiguity when determining which package an import
+originates from:
+
+```json
+{
+  "packages": {
+    "app-old": {
+      "path": "./app-old",
+      "dependencies": {
+        "lib": "lib-old"
+      }
+    },
+    "app-new": {
+      "path": "./app-new",
+      "dependencies": {
+        "lib": "lib-new"
+      }
+    },
+    "lib-old": {
+      "path": "./lib",
+      "dependencies": {
+        "react": "react-15"
+      }
+    },
+    "lib-new": {
+      "path": "./lib",
+      "dependencies": {
+        "react": "react-18"
+      }
+    }
+  }
+}
+```
+
+In the example above both `lib-old` and `lib-new` use the same `./lib` folder to
+store their sources, the only difference being in which version of `react` they'll
+access when performing require calls.
+
+Because multiple package entries share the same path, resolving a bare specifier
+from a file within that path is ambiguous unless the originating package ID is
+known. If the package ID cannot be determined (for example, because the caller
+did not propagate it from a previous resolution), Node.js will throw an error
+rather than guess.
+
+To support this pattern, implementers must key module instances by package ID
+and propagate it from each resolution result to subsequent resolution requests.
+This ensures that when `lib` requires `react`, the runtime knows whether the
+request comes from `lib-old` or `lib-new` and can select the correct dependency.
 
 ### CommonJS and ES modules
 
@@ -1343,7 +1385,6 @@ This field defines [subpath imports][] for the current package.
 [`--experimental-package-map`]: cli.md#--experimental-package-mappath
 [`--no-addons` flag]: cli.md#--no-addons
 [`ERR_PACKAGE_MAP_EXTERNAL_FILE`]: errors.md#err_package_map_external_file
-[`ERR_PACKAGE_MAP_INVALID`]: errors.md#err_package_map_invalid
 [`ERR_PACKAGE_PATH_NOT_EXPORTED`]: errors.md#err_package_path_not_exported
 [`ERR_UNKNOWN_FILE_EXTENSION`]: errors.md#err_unknown_file_extension
 [`package.json`]: #nodejs-packagejson-field-definitions
@@ -1354,6 +1395,7 @@ This field defines [subpath imports][] for the current package.
 [load ECMAScript modules from CommonJS modules]: modules.md#loading-ecmascript-modules-using-require
 [merve]: https://github.com/anonrig/merve
 [packages folder mapping]: https://github.com/WICG/import-maps#packages-via-trailing-slashes
+[resolution algorithm pseudo-code]: modules.md#all-together
 [self-reference]: #self-referencing-a-package-using-its-name
 [subpath exports]: #subpath-exports
 [subpath imports]: #subpath-imports
