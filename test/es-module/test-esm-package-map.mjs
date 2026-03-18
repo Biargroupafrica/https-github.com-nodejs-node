@@ -1,10 +1,30 @@
 import { spawnPromisified } from '../common/index.mjs';
 import * as fixtures from '../common/fixtures.mjs';
+import tmpdir from '../common/tmpdir.js';
 import assert from 'node:assert';
+import { writeFileSync } from 'node:fs';
 import { execPath } from 'node:process';
 import { describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
+
+tmpdir.refresh();
 
 const packageMapPath = fixtures.path('package-map/package-map.json');
+
+// Generated at runtime because file:// URLs must be absolute, making them machine-dependent.
+const fileUrlFixturePath = tmpdir.resolve('package-map-file-url.json');
+writeFileSync(fileUrlFixturePath, JSON.stringify({
+  packages: {
+    root: {
+      path: pathToFileURL(fixtures.path('package-map/root')).href,
+      dependencies: { 'dep-a': 'dep-a' },
+    },
+    'dep-a': {
+      path: pathToFileURL(fixtures.path('package-map/dep-a')).href,
+      dependencies: {},
+    },
+  },
+}));
 
 describe('ESM: --experimental-package-map', () => {
 
@@ -128,6 +148,32 @@ describe('ESM: --experimental-package-map', () => {
       assert.notStrictEqual(code, 0);
       assert.match(stderr, /ERR_PACKAGE_MAP_INVALID/);
       assert.match(stderr, /not found/);
+    });
+
+    it('throws ERR_PACKAGE_MAP_INVALID for unsupported URL scheme in path', async () => {
+      const { code, stderr } = await spawnPromisified(execPath, [
+        '--experimental-package-map',
+        fixtures.path('package-map/package-map-https-path.json'),
+        '--input-type=module',
+        '--eval', `import x from 'dep-a';`,
+      ], { cwd: fixtures.path('package-map/root') });
+
+      assert.notStrictEqual(code, 0);
+      assert.match(stderr, /ERR_PACKAGE_MAP_INVALID/);
+      assert.match(stderr, /unsupported URL scheme/);
+      assert.match(stderr, /https:\/\//);
+    });
+
+    it('accepts file:// URLs in path', async () => {
+      const { code, stdout, stderr } = await spawnPromisified(execPath, [
+        '--experimental-package-map', fileUrlFixturePath,
+        '--input-type=module',
+        '--eval',
+        `import dep from 'dep-a'; console.log(dep);`,
+      ], { cwd: fixtures.path('package-map/root') });
+
+      assert.strictEqual(code, 0, stderr);
+      assert.match(stdout, /dep-a-value/);
     });
 
     it('throws ERR_PACKAGE_MAP_INVALID for duplicate package paths', async () => {

@@ -4,9 +4,29 @@ require('../common');
 const fixtures = require('../common/fixtures');
 const assert = require('node:assert');
 const { spawnSync } = require('node:child_process');
+const { writeFileSync } = require('node:fs');
 const { describe, it } = require('node:test');
+const { pathToFileURL } = require('node:url');
+const tmpdir = require('../common/tmpdir');
+
+tmpdir.refresh();
 
 const packageMapPath = fixtures.path('package-map/package-map.json');
+
+// Generated at runtime because file:// URLs must be absolute, making them machine-dependent.
+const fileUrlFixturePath = tmpdir.resolve('package-map-file-url.json');
+writeFileSync(fileUrlFixturePath, JSON.stringify({
+  packages: {
+    root: {
+      path: pathToFileURL(fixtures.path('package-map/root')).href,
+      dependencies: { 'dep-a': 'dep-a' },
+    },
+    'dep-a': {
+      path: pathToFileURL(fixtures.path('package-map/dep-a')).href,
+      dependencies: {},
+    },
+  },
+}));
 
 describe('CJS: --experimental-package-map', () => {
 
@@ -113,6 +133,37 @@ describe('CJS: --experimental-package-map', () => {
 
       assert.notStrictEqual(status, 0);
       assert.match(stderr, /ERR_PACKAGE_MAP_INVALID/);
+    });
+
+    it('throws for unsupported URL scheme in path', () => {
+      const { status, stderr } = spawnSync(process.execPath, [
+        '--experimental-package-map',
+        fixtures.path('package-map/package-map-https-path.json'),
+        '-e',
+        `require('dep-a');`,
+      ], {
+        cwd: fixtures.path('package-map/root'),
+        encoding: 'utf8',
+      });
+
+      assert.notStrictEqual(status, 0);
+      assert.match(stderr, /ERR_PACKAGE_MAP_INVALID/);
+      assert.match(stderr, /unsupported URL scheme/);
+      assert.match(stderr, /https:\/\//);
+    });
+
+    it('accepts file:// URLs in path', () => {
+      const { status, stdout, stderr } = spawnSync(process.execPath, [
+        '--experimental-package-map', fileUrlFixturePath,
+        '-e',
+        `const dep = require('dep-a'); console.log(dep.default);`,
+      ], {
+        cwd: fixtures.path('package-map/root'),
+        encoding: 'utf8',
+      });
+
+      assert.strictEqual(status, 0, stderr);
+      assert.match(stdout, /dep-a-value/);
     });
 
     it('throws for duplicate package paths', () => {
