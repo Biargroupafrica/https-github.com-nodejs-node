@@ -188,7 +188,15 @@ static std::string OnDiskFileName(const char* id) {
     // V8 tools scripts are .mjs files.
     filename += ".mjs";
   } else {
-    filename += ".js";
+    std::string ts_filename = filename + ".ts";
+    uv_fs_t req;
+    int err = uv_fs_access(nullptr, &req, ts_filename.c_str(), 0, nullptr);
+    uv_fs_req_cleanup(&req);
+    if (err == 0) {
+      filename = std::move(ts_filename);
+    } else {
+      filename += ".js";
+    }
   }
 
   return filename;
