@@ -1022,8 +1022,8 @@ Each package entry has the following fields:
 When a bare specifier is encountered:
 
 1. Node.js determines which package performs the resolution request.
-    * If possible the package ID for the importer file should be provided to the resolution algorithm.
-    * Failing that, the resolution will check if the file path is within any package's `path`.
+   * If possible the package ID for the importer file should be provided to the resolution algorithm.
+   * Failing that, the resolution will check if the file path is within any package's `path`.
 2. If no package ID is provided and the importing file is not within any mapped package, an
    [`ERR_PACKAGE_MAP_EXTERNAL_FILE`][] error is thrown.
 3. Node.js looks up the specifier's package name in the importing package's
