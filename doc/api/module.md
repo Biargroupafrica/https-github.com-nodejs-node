@@ -105,18 +105,20 @@ When `caches` is `'resolution'` or `'all'` with `resolver` set to `'import'`, th
 resolution cache entry for the given `(specifier, parentURL, importAttributes)` tuple is
 cleared. When `resolver` is `'require'`, internal CJS resolution caches (including the
 relative resolve cache and path cache) are also cleared for the resolved filename.
-When `importAttributes` are provided, they are used to construct the cache key; if a module
+When `importAttributes` are provided for `'import'` resolution, they are used to construct the cache key; if a module
 was loaded with multiple different import attribute combinations, only the matching entry
 is cleared from the resolution cache. The module cache itself (`caches: 'module'`) clears
 all attribute variants for the URL.
 
-Clearing a module does not clear cached entries for its dependencies, and other specifiers
-that resolve to the same target may remain. Use consistent specifiers, or call `clearCache()`
-for each specifier you want to re-execute.
+Clearing a module does not clear cached entries for its dependencies. When using
+`resolver: 'import'`, resolution cache entries for other specifiers that resolve to the
+same target are not cleared — only the exact `(specifier, parentURL, importAttributes)`
+entry is removed. The module cache itself is cleared by resolved file path, so all
+specifiers pointing to the same file will see a fresh execution on next import.
 
 #### ECMA-262 spec considerations
 
-Re-importing the exact same `(specifier, parentURL)` pair after clearing the module cache
+Re-importing the exact same `(specifier, parentURL, importAttribtues)` tuple after clearing the module cache
 technically violates the idempotency invariant of the ECMA-262
 [`HostLoadImportedModule`][] host hook, which expects that the same module request always
 returns the same Module Record for a given referrer. For spec-compliant usage, use
@@ -149,31 +151,28 @@ watch(base, async () => {
 ```mjs
 import { clearCache } from 'node:module';
 
-const url = new URL('./mod.mjs', import.meta.url);
-await import(url.href);
+await import('./mod.mjs');
 
-clearCache(url, {
+clearCache('./mod.mjs', {
   parentURL: import.meta.url,
   resolver: 'import',
   caches: 'module',
 });
-await import(url.href); // re-executes the module
+await import('./mod.mjs'); // re-executes the module
 ```
 
 ```cjs
 const { clearCache } = require('node:module');
-const { pathToFileURL } = require('node:url');
-const path = require('node:path');
 
-const file = path.join(__dirname, 'mod.js');
-require(file);
+require('./mod.js');
 
-clearCache(file, {
-  parentURL: pathToFileURL(__filename),
+clearCache('./mod.js', {
+  parentURL: __filename,
   resolver: 'require',
   caches: 'module',
 });
-require(file); // re-executes the module
+require('./mod.js'); // eslint-disable-line node-core/no-duplicate-requires
+// re-executes the module
 ```
 
 ### `module.findPackageJSON(specifier[, base])`
