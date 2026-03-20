@@ -26,6 +26,7 @@ using v8::Value;
 namespace {
 
 inline uint64_t ROL64(uint64_t val, int offset) {
+  DCHECK(offset >= 0 && offset < 64);
   if (offset == 0) return val;
   return (val << offset) | (val >> (64 - offset));
 }
@@ -419,6 +420,7 @@ TurboShakeConfig& TurboShakeConfig::operator=(
 
 void TurboShakeConfig::MemoryInfo(MemoryTracker* tracker) const {
   if (job_mode == kCryptoJobAsync) {
+    // TODO(addaleax): Implement MemoryRetainer protocol for ByteSource
     tracker->TrackFieldWithSize("data", data.size());
   }
 }
@@ -525,6 +527,7 @@ KangarooTwelveConfig& KangarooTwelveConfig::operator=(
 
 void KangarooTwelveConfig::MemoryInfo(MemoryTracker* tracker) const {
   if (job_mode == kCryptoJobAsync) {
+    // TODO(addaleax): Implement MemoryRetainer protocol for ByteSource
     tracker->TrackFieldWithSize("data", data.size());
     tracker->TrackFieldWithSize("customization", customization.size());
   }
