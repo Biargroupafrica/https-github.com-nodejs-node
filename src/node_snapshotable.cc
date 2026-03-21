@@ -1504,6 +1504,11 @@ StartupData SerializeNodeContextInternalFields(Local<Object> holder,
     return StartupData{data, size};
   }
 
+  // Do not serialize fields unknown to BaseObject.
+  if (index >= BaseObject::kInternalFieldCount) {
+    return StartupData{nullptr, 0};
+  }
+
   // To serialize the slot field, invoke Serialize() method on the object.
   DCHECK_IS_SNAPSHOT_SLOT(index);
 
