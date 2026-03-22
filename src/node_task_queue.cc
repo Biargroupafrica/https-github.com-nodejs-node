@@ -55,6 +55,13 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
 
   if (env == nullptr || !env->can_call_into_js()) return;
 
+  // multipleResolves was removed in v25 (PR #58707).  Skip all work for
+  // these events to avoid OOM in tight Promise.race() loops (#51452).
+  if (event == kPromiseResolveAfterResolved ||
+      event == kPromiseRejectAfterResolved) {
+    return;
+  }
+
   Local<Function> callback = env->promise_reject_callback();
   // The promise is rejected before JS land calls SetPromiseRejectCallback
   // to initializes the promise reject callback during bootstrap.
@@ -77,10 +84,6 @@ void PromiseRejectCallback(PromiseRejectMessage message) {
                   "rejections",
                   "unhandled", unhandledRejections,
                   "handledAfter", rejectionsHandledAfter);
-  } else if (event == kPromiseResolveAfterResolved) {
-    value = message.GetValue();
-  } else if (event == kPromiseRejectAfterResolved) {
-    value = message.GetValue();
   } else {
     return;
   }
@@ -173,8 +176,6 @@ static void Initialize(Local<Object> target,
   Local<Object> events = Object::New(isolate);
   NODE_DEFINE_CONSTANT(events, kPromiseRejectWithNoHandler);
   NODE_DEFINE_CONSTANT(events, kPromiseHandlerAddedAfterReject);
-  NODE_DEFINE_CONSTANT(events, kPromiseResolveAfterResolved);
-  NODE_DEFINE_CONSTANT(events, kPromiseRejectAfterResolved);
 
   target->Set(env->context(),
               FIXED_ONE_BYTE_STRING(isolate, "promiseRejectEvents"),
