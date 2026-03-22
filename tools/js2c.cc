@@ -13,6 +13,7 @@
 #include "embedded_data.h"
 #include "executable_wrapper.h"
 #include "simdutf.h"
+#include "typescript_transpiler.h"
 #include "uv.h"
 
 #if defined(_WIN32)
@@ -131,13 +132,14 @@ bool SearchFiles(const std::string& dir,
 
 constexpr std::string_view kMjsSuffix = ".mjs";
 constexpr std::string_view kJsSuffix = ".js";
+constexpr std::string_view kTsSuffix = ".ts";
 constexpr std::string_view kGypiSuffix = ".gypi";
 constexpr std::string_view depsPrefix = "deps/";
 constexpr std::string_view libPrefix = "lib/";
 
 constexpr std::string_view HasAllowedExtensions(
     const std::string_view filename) {
-  for (const auto& ext : {kGypiSuffix, kJsSuffix, kMjsSuffix}) {
+  for (const auto& ext : {kGypiSuffix, kJsSuffix, kMjsSuffix, kTsSuffix}) {
     if (filename.ends_with(ext)) {
       return ext;
     }
@@ -329,11 +331,13 @@ std::string GetFileId(const std::string& filename) {
   size_t end = filename.size();
   size_t start = 0;
   std::string prefix;
-  // Strip .mjs and .js suffix
+  // Strip .mjs, .js and .ts suffix
   if (filename.ends_with(kMjsSuffix)) {
     end -= kMjsSuffix.size();
   } else if (filename.ends_with(kJsSuffix)) {
     end -= kJsSuffix.size();
+  } else if (filename.ends_with(kTsSuffix)) {
+    end -= kTsSuffix.size();
   }
 
   // deps/acorn/acorn/dist/acorn.js -> internal/deps/acorn/acorn/dist/acorn
@@ -670,6 +674,7 @@ Fragment GetDefinition(const std::string& var, const std::vector<char>& code) {
 }
 
 int AddModule(const std::string& filename,
+              TypeScriptTranspiler* transpiler,
               Fragments* definitions,
               Fragments* initializers,
               Fragments* registrations) {
@@ -684,6 +689,21 @@ int AddModule(const std::string& filename,
   if (error != 0) {
     return error;
   }
+
+  if (filename.ends_with(kTsSuffix)) {
+    std::vector<char> transpiled;
+    if (transpiler->Strip(std::string_view(code.data(), code.size()),
+                          filename,
+                          &transpiled) != 0) {
+      fprintf(stderr,
+              "Failed to transpile TypeScript file %s: %s\n",
+              filename.c_str(),
+              std::string(transpiler->LastError()).c_str());
+      return 1;
+    }
+    code = std::move(transpiled);
+  }
+
   std::string file_id = GetFileId(filename);
   std::string var = GetVariableName(file_id);
 
@@ -826,23 +846,39 @@ int AddGypi(const std::string& var,
 
 int JS2C(const FileList& js_files,
          const FileList& mjs_files,
+         const FileList& ts_files,
          const std::string& config,
+         const char* argv0,
          const std::string& dest) {
+  TypeScriptTranspiler transpiler;
   Fragments definitions;
-  definitions.reserve(js_files.size() + mjs_files.size() + 1);
+  definitions.reserve(js_files.size() + mjs_files.size() + ts_files.size() + 1);
   Fragments initializers;
-  initializers.reserve(js_files.size() + mjs_files.size());
+  initializers.reserve(js_files.size() + mjs_files.size() + ts_files.size());
   Fragments registrations;
-  registrations.reserve(js_files.size() + mjs_files.size() + 1);
+  registrations.reserve(js_files.size() + mjs_files.size() + ts_files.size() +
+                        1);
 
-  for (const auto& filename : js_files) {
-    int r = AddModule(filename, &definitions, &initializers, &registrations);
-    if (r != 0) {
-      return r;
-    }
+  if (!ts_files.empty() && transpiler.Initialize(argv0) != 0) {
+    fprintf(stderr,
+            "Failed to initialize TypeScript transpiler: %s\n",
+            std::string(transpiler.LastError()).c_str());
+    return 1;
   }
-  for (const auto& filename : mjs_files) {
-    int r = AddModule(filename, &definitions, &initializers, &registrations);
+
+  auto add_modules = [&](const FileList& files) {
+    for (const auto& filename : files) {
+      int r = AddModule(
+          filename, &transpiler, &definitions, &initializers, &registrations);
+      if (r != 0) {
+        return r;
+      }
+    }
+    return 0;
+  };
+
+  for (const auto* files : {&js_files, &mjs_files, &ts_files}) {
+    int r = add_modules(*files);
     if (r != 0) {
       return r;
     }
@@ -910,7 +946,8 @@ int Main(int argc, char* argv[]) {
     const std::string& file = args[i];
     if (IsDirectory(file, &error)) {
       if (!SearchFiles(file, &file_map, kJsSuffix) ||
-          !SearchFiles(file, &file_map, kMjsSuffix)) {
+          !SearchFiles(file, &file_map, kMjsSuffix) ||
+          !SearchFiles(file, &file_map, kTsSuffix)) {
         return 1;
       }
     } else if (error != 0) {
@@ -927,8 +964,6 @@ int Main(int argc, char* argv[]) {
     }
   }
 
-  // Should have exactly 3 types: `.js`, `.mjs` and `.gypi`.
-  assert(file_map.size() == 3);
   auto gypi_it = file_map.find(".gypi");
   // Currently config.gypi is the only `.gypi` file allowed
   if (gypi_it == file_map.end() || gypi_it->second.size() != 1 ||
@@ -940,19 +975,37 @@ int Main(int argc, char* argv[]) {
   }
   auto js_it = file_map.find(".js");
   auto mjs_it = file_map.find(".mjs");
-  assert(js_it != file_map.end() && mjs_it != file_map.end());
-
-  auto it = std::find(mjs_it->second.begin(),
-                      mjs_it->second.end(),
-                      "lib/eslint.config_partial.mjs");
-  if (it != mjs_it->second.end()) {
-    mjs_it->second.erase(it);
+  auto ts_it = file_map.find(".ts");
+  if (mjs_it != file_map.end()) {
+    auto it = std::find(mjs_it->second.begin(),
+                        mjs_it->second.end(),
+                        "lib/eslint.config_partial.mjs");
+    if (it != mjs_it->second.end()) {
+      mjs_it->second.erase(it);
+    }
   }
 
-  std::sort(js_it->second.begin(), js_it->second.end());
-  std::sort(mjs_it->second.begin(), mjs_it->second.end());
+  if (js_it != file_map.end()) {
+    std::sort(js_it->second.begin(), js_it->second.end());
+  }
+  if (mjs_it != file_map.end()) {
+    std::sort(mjs_it->second.begin(), mjs_it->second.end());
+  }
+  if (ts_it != file_map.end()) {
+    std::sort(ts_it->second.begin(), ts_it->second.end());
+  }
 
-  return JS2C(js_it->second, mjs_it->second, gypi_it->second[0], output);
+  static const FileList empty_list;
+  const FileList& js_files =
+      js_it == file_map.end() ? empty_list : js_it->second;
+  const FileList& mjs_files =
+      mjs_it == file_map.end() ? empty_list : mjs_it->second;
+  return JS2C(js_files,
+              mjs_files,
+              ts_it == file_map.end() ? empty_list : ts_it->second,
+              gypi_it->second[0],
+              argv[0],
+              output);
 }
 }  // namespace js2c
 }  // namespace node
