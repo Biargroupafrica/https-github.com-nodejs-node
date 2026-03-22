@@ -1080,7 +1080,7 @@ bool CanEnableWebAssemblyTrapHandler() {
 
   return can_enable;
 #else
-  return false;
+  return true;
 #endif  // __POSIX__
 }
 #endif  // NODE_USE_V8_WASM_TRAP_HANDLER

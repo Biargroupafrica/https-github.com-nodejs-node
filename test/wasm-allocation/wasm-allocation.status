@@ -10,7 +10,6 @@ prefix wasm-allocation
 test-wasm-allocation: SKIP
 test-wasm-allocation-auto-adapt: SKIP
 test-wasm-allocation-memory64: SKIP
-test-wasm-allocation-memory64-auto-adapt: SKIP
 
 [$arch!=x64 && $arch!=arm64]
 test-wasm-allocation: SKIP
