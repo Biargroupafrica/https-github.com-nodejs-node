@@ -6364,9 +6364,9 @@ var require_formdata_parser = __commonJS({
     var { webidl } = require_webidl();
     var assert = require("node:assert");
     var { isomorphicDecode } = require_infra();
-    var { utf8DecodeBytes } = require_encoding();
     var dd = Buffer.from("--");
     var decoder = new TextDecoder();
+    var decoderIgnoreBOM = new TextDecoder("utf-8", { ignoreBOM: true });
     function isAsciiString(chars) {
       for (let i = 0; i < chars.length; ++i) {
         if ((chars.charCodeAt(i) & ~127) !== 0) {
@@ -6445,7 +6445,7 @@ var require_formdata_parser = __commonJS({
           }
           value = new File([body], filename, { type: contentType });
         } else {
-          value = utf8DecodeBytes(Buffer.from(body));
+          value = decoderIgnoreBOM.decode(Buffer.from(body));
         }
         assert(webidl.is.USVString(name));
         assert(typeof value === "string" && webidl.is.USVString(value) || webidl.is.File(value));
