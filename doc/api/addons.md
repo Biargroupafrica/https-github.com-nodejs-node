@@ -280,6 +280,9 @@ such as any libuv handles registered by the addon.
 
 The following `addon.cc` uses `AddEnvironmentCleanupHook`:
 
+
+<!-- addon-verify-file worker_support/addon.cc -->
+
 ```cpp
 // addon.cc
 #include <node.h>
@@ -327,6 +330,9 @@ NODE_MODULE_INIT(/* exports, module, context */) {
 ```
 
 Test in JavaScript by running:
+
+
+<!-- addon-verify-file worker_support/test.js -->
 
 ```js
 // test.js
@@ -526,6 +532,9 @@ code.
 The following example illustrates how to read function arguments passed from
 JavaScript and how to return a result:
 
+
+<!-- addon-verify-file function_arguments/addon.cc -->
+
 ```cpp
 // addon.cc
 #include <node.h>
@@ -585,6 +594,9 @@ NODE_MODULE(NODE_GYP_MODULE_NAME, Init)
 
 Once compiled, the example addon can be required and used from within Node.js:
 
+
+<!-- addon-verify-file function_arguments/test.js -->
+
 ```js
 // test.js
 const addon = require('./build/Release/addon');
@@ -597,6 +609,9 @@ console.log('This should be eight:', addon.add(3, 5));
 It is common practice within addons to pass JavaScript functions to a C++
 function and execute them from there. The following example illustrates how
 to invoke such callbacks:
+
+
+<!-- addon-verify-file callbacks/addon.cc -->
 
 ```cpp
 // addon.cc
@@ -641,6 +656,9 @@ property of `exports`.
 
 To test it, run the following JavaScript:
 
+
+<!-- addon-verify-file callbacks/test.js -->
+
 ```js
 // test.js
 const addon = require('./build/Release/addon');
@@ -658,6 +676,9 @@ In this example, the callback function is invoked synchronously.
 Addons can create and return new objects from within a C++ function as
 illustrated in the following example. An object is created and returned with a
 property `msg` that echoes the string passed to `createObject()`:
+
+
+<!-- addon-verify-file object_factory/addon.cc -->
 
 ```cpp
 // addon.cc
@@ -698,6 +719,9 @@ NODE_MODULE(NODE_GYP_MODULE_NAME, Init)
 
 To test it in JavaScript:
 
+
+<!-- addon-verify-file object_factory/test.js -->
+
 ```js
 // test.js
 const addon = require('./build/Release/addon');
@@ -712,6 +736,9 @@ console.log(obj1.msg, obj2.msg);
 
 Another common scenario is creating JavaScript functions that wrap C++
 functions and returning those back to JavaScript:
+
+
+<!-- addon-verify-file function_factory/addon.cc -->
 
 ```cpp
 // addon.cc
@@ -760,6 +787,9 @@ NODE_MODULE(NODE_GYP_MODULE_NAME, Init)
 
 To test:
 
+
+<!-- addon-verify-file function_factory/test.js -->
+
 ```js
 // test.js
 const addon = require('./build/Release/addon');
@@ -773,6 +803,9 @@ console.log(fn());
 
 It is also possible to wrap C++ objects/classes in a way that allows new
 instances to be created using the JavaScript `new` operator:
+
+
+<!-- addon-verify-file wrapping_c_objects/addon.cc -->
 
 ```cpp
 // addon.cc
@@ -794,6 +827,9 @@ NODE_MODULE(NODE_GYP_MODULE_NAME, InitAll)
 ```
 
 Then, in `myobject.h`, the wrapper class inherits from `node::ObjectWrap`:
+
+
+<!-- addon-verify-file wrapping_c_objects/myobject.h -->
 
 ```cpp
 // myobject.h
@@ -827,6 +863,9 @@ class MyObject : public node::ObjectWrap {
 In `myobject.cc`, implement the various methods that are to be exposed.
 In the following code, the method `plusOne()` is exposed by adding it to the
 constructor's prototype:
+
+
+<!-- addon-verify-file wrapping_c_objects/myobject.cc -->
 
 ```cpp
 // myobject.cc
@@ -931,6 +970,9 @@ To build this example, the `myobject.cc` file must be added to the
 
 Test it with:
 
+
+<!-- addon-verify-file wrapping_c_objects/test.js -->
+
 ```js
 // test.js
 const addon = require('./build/Release/addon');
@@ -968,6 +1010,9 @@ const obj = addon.createObject();
 
 First, the `createObject()` method is implemented in `addon.cc`:
 
+
+<!-- addon-verify-file factory_of_wrapped_objects/addon.cc -->
+
 ```cpp
 // addon.cc
 #include <node.h>
@@ -1001,6 +1046,9 @@ In `myobject.h`, the static method `NewInstance()` is added to handle
 instantiating the object. This method takes the place of using `new` in
 JavaScript:
 
+
+<!-- addon-verify-file factory_of_wrapped_objects/myobject.h -->
+
 ```cpp
 // myobject.h
 #ifndef MYOBJECT_H
@@ -1032,6 +1080,9 @@ class MyObject : public node::ObjectWrap {
 ```
 
 The implementation in `myobject.cc` is similar to the previous example:
+
+
+<!-- addon-verify-file factory_of_wrapped_objects/myobject.cc -->
 
 ```cpp
 // myobject.cc
@@ -1147,6 +1198,9 @@ Once again, to build this example, the `myobject.cc` file must be added to the
 
 Test it with:
 
+
+<!-- addon-verify-file factory_of_wrapped_objects/test.js -->
+
 ```js
 // test.js
 const createObject = require('./build/Release/addon');
@@ -1174,6 +1228,9 @@ In addition to wrapping and returning C++ objects, it is possible to pass
 wrapped objects around by unwrapping them with the Node.js helper function
 `node::ObjectWrap::Unwrap`. The following examples shows a function `add()`
 that can take two `MyObject` objects as input arguments:
+
+
+<!-- addon-verify-file passing_wrapped_objects_around/addon.cc -->
 
 ```cpp
 // addon.cc
@@ -1224,6 +1281,9 @@ NODE_MODULE(NODE_GYP_MODULE_NAME, InitAll)
 In `myobject.h`, a new public method is added to allow access to private values
 after unwrapping the object.
 
+
+<!-- addon-verify-file passing_wrapped_objects_around/myobject.h -->
+
 ```cpp
 // myobject.h
 #ifndef MYOBJECT_H
@@ -1255,6 +1315,9 @@ class MyObject : public node::ObjectWrap {
 ```
 
 The implementation of `myobject.cc` remains similar to the previous version:
+
+
+<!-- addon-verify-file passing_wrapped_objects_around/myobject.cc -->
 
 ```cpp
 // myobject.cc
@@ -1339,6 +1402,9 @@ void MyObject::NewInstance(const FunctionCallbackInfo<Value>& args) {
 ```
 
 Test it with:
+
+
+<!-- addon-verify-file passing_wrapped_objects_around/test.js -->
 
 ```js
 // test.js
